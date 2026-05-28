@@ -32,13 +32,14 @@ export function ConsolePanel({
   // Passed / total from test events (fallback if result hasn't arrived yet)
   const passedCount = tests.filter((t) => t.status === 'passed').length;
   const totalCount = tests.length;
+  const allPassed = result ? result.score === 100 : (totalCount > 0 && passedCount === totalCount);
 
   return (
     <div className="flex h-full flex-col bg-background">
       {/* Tab bar + summary */}
       <div className="flex items-center gap-1 border-b border-border px-2 py-1 text-xs">
         <TabBtn active={tab === 'tests'} onClick={() => setTab('tests')}>
-          Tests {totalCount > 0 && <Badge n={totalCount} ok={!failed && passedCount === totalCount && !isRunning} />}
+          Tests {totalCount > 0 && <Badge n={totalCount} ok={!failed && allPassed && !isRunning} />}
         </TabBtn>
         <TabBtn active={tab === 'console'} onClick={() => setTab('console')}>
           Console {logs.length > 0 && <span className="ml-1 rounded bg-muted px-1.5 text-[10px]">{logs.length}</span>}
@@ -53,8 +54,8 @@ export function ConsolePanel({
               <Loader2 className="h-3 w-3 animate-spin" /> Running…
             </span>
           ) : result ? (
-            <span className={result.passed === result.total ? 'text-emerald-400' : 'text-rose-400'}>
-              {result.passed}/{result.total} passed · {result.score}% · {result.runtime_ms}ms
+            <span className={result.score === 100 ? 'text-emerald-400' : result.score >= 50 ? 'text-amber-400' : 'text-rose-400'}>
+              {result.passed}/{result.total} tests · {result.score}% · {result.runtime_ms}ms
             </span>
           ) : failed ? (
             <span className="text-rose-400">Execution failed</span>

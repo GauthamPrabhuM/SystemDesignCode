@@ -97,7 +97,8 @@ class SandboxRunner:
                     await emit({"type": "failed", "error": "Compilation error", "stderr": compile_res["stderr"]})
                     return
 
-            passed = 0
+            passed_count = 0   # number of tests that passed (for display)
+            passed_weight = 0  # weighted sum (for score calculation)
             total = len(test_cases)
             total_runtime_ms = 0
             max_memory_kb = 0
@@ -146,7 +147,8 @@ class SandboxRunner:
                 expected = tc["expected"]
                 test_status = "passed" if actual == expected else "failed"
                 if test_status == "passed":
-                    passed += tc["weight"]
+                    passed_count += 1
+                    passed_weight += tc["weight"]
                 diff = self._make_diff(actual, expected) if test_status == "failed" else None
 
                 await self._save_test_result(sub_id, tc["id"], test_status, res, diff=diff)
@@ -158,13 +160,13 @@ class SandboxRunner:
                 })
 
             total_weight = sum(t["weight"] for t in test_cases) or 1
-            score = (passed / total_weight) * 100
+            score = (passed_weight / total_weight) * 100
 
             await self._finalize_submission(
                 sub_id,
                 status="done",
                 score=score,
-                passed_tests=passed,
+                passed_tests=passed_count,  # count of passing tests, not weighted sum
                 total_tests=total,
                 runtime_ms=total_runtime_ms,
                 memory_kb=max_memory_kb,
@@ -172,7 +174,7 @@ class SandboxRunner:
             await emit({
                 "type": "result",
                 "score": round(score, 2),
-                "passed": passed,
+                "passed": passed_count,
                 "total": total,
                 "runtime_ms": total_runtime_ms,
                 "memory_kb": max_memory_kb,

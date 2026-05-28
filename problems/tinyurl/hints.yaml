@@ -1,0 +1,22 @@
+- title: "ID generation strategy"
+  text: >
+    You need a unique 6-character code for each URL. Two approaches: (1) Random
+    — pick 6 chars from [a-zA-Z0-9], check collision, retry if taken. With 56B
+    combinations and <1M URLs, collision probability is negligible. (2) Counter
+    — encode an auto-incrementing ID in base62. Deterministic, no collision,
+    but exposes sequence. Start with random; explain base62 as an alternative.
+
+- title: "Track clicks in the expand operation"
+  text: >
+    The stats() method returns click count. Where do you increment it?
+    In expand() — every successful expansion is a click. Store a separate
+    clicks: dict[code, int] alongside your codes: dict[code, url].
+    If expand() is called for a missing/deleted code, don't increment.
+
+- title: "Collision handling for random codes"
+  text: >
+    Your generate() function must handle the (rare) case where a random code
+    is already taken. Use a retry loop: try up to 10-100 times, each time
+    generating a new random code. If all attempts fail (only happens when the
+    namespace is nearly full), raise an error. In a real system, you'd use a
+    pre-generated pool of codes checked out from a separate service.

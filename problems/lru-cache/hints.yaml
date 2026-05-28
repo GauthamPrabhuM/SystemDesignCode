@@ -1,0 +1,19 @@
+- title: "Choose your data structures"
+  text: >
+    You need O(1) get() and O(1) put(). A HashMap gives O(1) lookup by key.
+    What data structure lets you move an arbitrary item to the front AND remove
+    the item at the back in O(1)?
+
+- title: "HashMap + Doubly-Linked List"
+  text: >
+    Combine a HashMap (key → node pointer) with a doubly-linked list
+    (MRU at head, LRU at tail). get() looks up the node in the map, moves it
+    to the front of the list. put() looks up or creates a node, moves to front,
+    and evicts the tail node if len > capacity. Both ops are O(1).
+
+- title: "Sentinel nodes eliminate edge cases"
+  text: >
+    Add dummy _head and _tail sentinel nodes so you never handle empty-list or
+    single-element edge cases. _remove(node) just rewires its prev/next
+    neighbours. _push_front(node) inserts between _head and _head.next.
+    4-line functions, no null checks. Java's LinkedHashMap uses exactly this pattern.

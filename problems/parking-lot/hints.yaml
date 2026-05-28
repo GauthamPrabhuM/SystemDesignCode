@@ -1,0 +1,21 @@
+- title: "Model the domain first"
+  text: >
+    Before writing any code, identify the entities: Vehicle, Spot, Ticket,
+    ParkingLot, Floor. A Ticket is the receipt that links a Vehicle to a Spot
+    at an entry timestamp. When a vehicle leaves, you use the Ticket to find
+    the spot and compute the bill.
+
+- title: "Use Strategy for pricing"
+  text: >
+    Different vehicle types pay different rates, and you might add more rate
+    schemes later (weekend pricing, EV discount). Define a PricingStrategy
+    interface with one method: calculate(ticket, exit_ts) → int.
+    HourlyPricing is the first implementation. ParkingLotService takes a
+    strategy at construction — easy to swap in tests.
+
+- title: "Thread safety with a single lock"
+  text: >
+    park() and unpark() both mutate shared state (the spots array + tickets map).
+    Wrap the critical section in a threading.Lock (or synchronized in Java).
+    Don't lock the entire service object across the billing calculation — compute
+    the bill after releasing the lock to minimise contention.

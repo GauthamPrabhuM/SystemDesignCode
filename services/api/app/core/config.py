@@ -31,8 +31,8 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
 
     # Submission quotas (per user, per hour)
-    QUOTA_SUBMISSIONS_FREE: int = 10
-    QUOTA_SUBMISSIONS_PRO: int = 60
+    QUOTA_SUBMISSIONS_FREE: int = 50
+    QUOTA_SUBMISSIONS_PRO: int = 200
 
     # AI
     ANTHROPIC_API_KEY: str = ""

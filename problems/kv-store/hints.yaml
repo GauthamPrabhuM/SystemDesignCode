@@ -1,0 +1,22 @@
+- title: "Store expiry as an absolute timestamp"
+  text: >
+    Don't store "time remaining" — it changes every millisecond. Instead, store
+    the absolute expiry timestamp: expiry = now_ms + ttl_ms at the time of set().
+    Then any read operation just checks: if now_ms >= expiry → key is expired.
+    If TTL is not set, store None/null/0 as a sentinel for "no expiry".
+
+- title: "Lazy expiry — delete on access, not in background"
+  text: >
+    Don't run a background thread to scan and delete expired keys. Instead,
+    check expiry on every get(), exists(), ttl(), and keys(). This is called
+    lazy expiry. It's simple, correct, and good enough for this problem.
+    Redis uses lazy expiry as its primary mechanism, with periodic background
+    cleanup as a secondary pass for keys that are never accessed again.
+
+- title: "keys() must filter and sort"
+  text: >
+    keys(now_ms) should return only non-expired keys, sorted alphabetically.
+    Iterate all keys, apply the alive() check (same logic as get()), collect
+    survivors, sort, return. Don't forget the sort — the test cases rely on
+    consistent ordering. In production, you'd maintain a sorted index separately
+    rather than sorting on every keys() call.

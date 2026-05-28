@@ -1,0 +1,22 @@
+- title: "Pick your algorithm"
+  text: >
+    Two main algorithms — know the trade-off:
+    Token Bucket: tokens refill at a constant rate; allows controlled bursts
+    (easier to implement, better UX). Sliding Window Counter: counts requests
+    in the last N ms; no burst allowed (more accurate, slightly harder).
+    For this problem, implement sliding window.
+
+- title: "Per-user deque of timestamps"
+  text: >
+    For each user_id, maintain a deque (double-ended queue) of request
+    timestamps in the current window. On allow(user_id, now_ms): first evict
+    all timestamps where ts <= now_ms - window_ms (slide the window), then
+    check len(deque) < rate. If yes, append now_ms and return True; else False.
+
+- title: "Memory management for inactive users"
+  text: >
+    In production, users who haven't made requests recently shouldn't hold
+    memory forever. Two approaches: (1) evict empty deques after window_ms of
+    inactivity, or (2) use Redis with TTL on each user's key. For this
+    problem, evicting at allow() time is sufficient — just don't skip the
+    eviction step.

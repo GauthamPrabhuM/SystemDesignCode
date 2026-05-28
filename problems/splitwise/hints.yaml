@@ -1,0 +1,23 @@
+- title: "Model balances as a graph"
+  text: >
+    Don't store expenses as a list and recalculate. Instead, maintain a net
+    balance graph: net[a][b] > 0 means b owes a that amount.
+    Adding an expense just calls adjust(payer, each_member, their_share).
+    adjust(creditor, debtor, amount) increments net[creditor][debtor] and
+    decrements net[debtor][creditor]. Balances are always consistent.
+
+- title: "Equal split with remainder"
+  text: >
+    When amount doesn't divide evenly (e.g., ₹100 split 3 ways = ₹33.33),
+    use integer division: base = amount // n, extra = amount % n.
+    Give the payer the remainder: first `extra` members in the list get
+    base+1, rest get base. This is Splitwise's actual rounding strategy.
+
+- title: "Simplify with greedy creditor-debtor matching"
+  text: >
+    To find minimum transactions: compute net balance for each person.
+    Separate into creditors (positive balance) and debtors (negative).
+    Greedily match the largest creditor with the largest debtor: transfer
+    min(credit, debt). One of them reaches zero — advance that pointer.
+    Repeat until all settled. This is O(n log n) and optimal for the
+    minimum number of transactions.

@@ -1,0 +1,21 @@
+slug: lru-cache
+title: "Design an LRU Cache"
+difficulty: easy
+category: lld
+time_limit_minutes: 45
+companies: [amazon, google, microsoft, atlassian]
+tags: [oop, data-structures, hashmap, doubly-linked-list]
+constraints:
+  max_capacity: 10000
+  operations: [get, put, delete, size]
+rubric:
+  dimensions:
+    correctness:     { weight: 50 }
+    oop_design:      { weight: 20 }
+    time_complexity: { weight: 20 }
+    edge_cases:      { weight: 10 }
+  expected_patterns: [doubly_linked_list, hashmap]
+  red_flags:
+    - linear_scan_on_get
+    - missing_thread_safety
+    - hashmap_only_no_eviction_order

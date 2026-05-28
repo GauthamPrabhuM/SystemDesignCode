@@ -1,0 +1,129 @@
+name: Deploy to GCP Cloud Run
+
+on:
+  push:
+    branches: [main]
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: ${{ secrets.GCP_REGION }}
+  REGISTRY: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/systemdesigncode
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # needed for Workload Identity Federation (recommended)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          # Alternatively, use Workload Identity Federation (no JSON key):
+          # workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER
+          # service_account: deploy@PROJECT_ID.iam.gserviceaccount.com
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker to use Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # ── Build & push API ──────────────────────────────────────────────────
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: services/api
+          push: true
+          tags: ${{ env.REGISTRY }}/api:${{ github.sha }},${{ env.REGISTRY }}/api:latest
+
+      # ── Build & push Executor ─────────────────────────────────────────────
+      - name: Build Executor image
+        uses: docker/build-push-action@v6
+        with:
+          context: services/executor
+          push: true
+          tags: ${{ env.REGISTRY }}/executor:${{ github.sha }},${{ env.REGISTRY }}/executor:latest
+
+      # ── Build & push Web ──────────────────────────────────────────────────
+      - name: Build Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/web
+          push: true
+          tags: ${{ env.REGISTRY }}/web:${{ github.sha }},${{ env.REGISTRY }}/web:latest
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api-${{ secrets.GCP_PROJECT_ID }}.a.run.app
+            NEXT_PUBLIC_WS_URL=wss://api-${{ secrets.GCP_PROJECT_ID }}.a.run.app
+
+      # ── Deploy API to Cloud Run ───────────────────────────────────────────
+      - name: Deploy API
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: sdc-api
+          image: ${{ env.REGISTRY }}/api:${{ github.sha }}
+          region: ${{ env.REGION }}
+          env_vars: |
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            REDIS_URL=${{ secrets.REDIS_URL }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            JWT_ALG=HS256
+            ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+            ALLOWED_ORIGINS=https://web-${{ secrets.GCP_PROJECT_ID }}.a.run.app
+          flags: >-
+            --allow-unauthenticated
+            --min-instances=0
+            --max-instances=10
+            --memory=512Mi
+            --cpu=1
+            --concurrency=80
+            --timeout=60s
+
+      # ── Deploy Executor to Cloud Run ──────────────────────────────────────
+      - name: Deploy Executor
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: sdc-executor
+          image: ${{ env.REGISTRY }}/executor:${{ github.sha }}
+          region: ${{ env.REGION }}
+          env_vars: |
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            REDIS_URL=${{ secrets.REDIS_URL }}
+            EXECUTOR_RUNTIME=docker
+            SANDBOX_MEMORY=256m
+            SANDBOX_CPUS=0.5
+            SANDBOX_TIMEOUT_S=10
+          flags: >-
+            --no-allow-unauthenticated
+            --min-instances=0
+            --max-instances=5
+            --memory=1Gi
+            --cpu=1
+            --concurrency=4
+            --timeout=120s
+
+      # ── Deploy Web to Cloud Run ───────────────────────────────────────────
+      - name: Deploy Web
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: sdc-web
+          image: ${{ env.REGISTRY }}/web:${{ github.sha }}
+          region: ${{ env.REGION }}
+          flags: >-
+            --allow-unauthenticated
+            --min-instances=0
+            --max-instances=10
+            --memory=512Mi
+            --cpu=1
+            --concurrency=80
+
+      - name: Print service URLs
+        run: |
+          echo "API:      $(gcloud run services describe sdc-api      --region $REGION --format 'value(status.url)')"
+          echo "Executor: $(gcloud run services describe sdc-executor --region $REGION --format 'value(status.url)')"
+          echo "Web:      $(gcloud run services describe sdc-web      --region $REGION --format 'value(status.url)')"

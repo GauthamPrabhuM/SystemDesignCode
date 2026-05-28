@@ -1,0 +1,45 @@
+- name: park_one_car
+  kind: public
+  weight: 1
+  timeout_ms: 5000
+  input:
+    commands:
+      - {op: park, vehicle: {license: "KA-01-1", type: car}, ts: 1700000000}
+  expected:
+    responses:
+      - {ticket: "T-1"}
+
+- name: park_and_unpark_one_hour
+  kind: public
+  weight: 2
+  timeout_ms: 5000
+  input:
+    commands:
+      - {op: park,   vehicle: {license: "KA-01-1", type: car}, ts: 1700000000}
+      - {op: unpark, ticket: "T-1", ts: 1700003600}
+  expected:
+    responses:
+      - {ticket: "T-1"}
+      - {bill: 50}
+
+- name: free_spots_after_park
+  kind: public
+  weight: 1
+  timeout_ms: 5000
+  input:
+    commands:
+      - {op: park, vehicle: {license: "KA-01-1", type: car}, ts: 1700000000}
+      - {op: free_spots}
+  expected:
+    responses:
+      - {ticket: "T-1"}
+      - {free: 29}
+
+- name: lot_full_returns_null
+  kind: hidden
+  weight: 3
+  timeout_ms: 8000
+  input:
+    commands: []  # generated programmatically by the test harness
+  expected:
+    last_response_has_null_ticket: true

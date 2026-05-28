@@ -1,0 +1,92 @@
+- name: basic_put_get
+  kind: public
+  weight: 1
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: init, capacity: 2}
+      - {op: put, key: "a", value: 1}
+      - {op: get, key: "a"}
+  expected:
+    responses:
+      - {ok: true}
+      - {ok: true}
+      - {value: 1}
+
+- name: eviction_on_capacity
+  kind: public
+  weight: 2
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: init, capacity: 2}
+      - {op: put, key: "a", value: 1}
+      - {op: put, key: "b", value: 2}
+      - {op: put, key: "c", value: 3}
+      - {op: get, key: "a"}
+  expected:
+    responses:
+      - {ok: true}
+      - {ok: true}
+      - {ok: true}
+      - {ok: true}
+      - {value: null}
+
+- name: get_marks_recent
+  kind: public
+  weight: 2
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: init, capacity: 2}
+      - {op: put, key: "a", value: 1}
+      - {op: put, key: "b", value: 2}
+      - {op: get, key: "a"}                  # a becomes most-recent
+      - {op: put, key: "c", value: 3}        # evicts b, not a
+      - {op: get, key: "b"}
+      - {op: get, key: "a"}
+  expected:
+    responses:
+      - {ok: true}
+      - {ok: true}
+      - {ok: true}
+      - {value: 1}
+      - {ok: true}
+      - {value: null}
+      - {value: 1}
+
+- name: update_existing_key
+  kind: hidden
+  weight: 2
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: init, capacity: 2}
+      - {op: put, key: "a", value: 1}
+      - {op: put, key: "a", value: 99}
+      - {op: size}
+      - {op: get, key: "a"}
+  expected:
+    responses:
+      - {ok: true}
+      - {ok: true}
+      - {ok: true}
+      - {size: 1}
+      - {value: 99}
+
+- name: delete_returns_existed
+  kind: hidden
+  weight: 1
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: init, capacity: 5}
+      - {op: put, key: "a", value: 1}
+      - {op: delete, key: "a"}
+      - {op: delete, key: "a"}
+  expected:
+    responses:
+      - {ok: true}
+      - {ok: true}
+      - {existed: true}
+      - {existed: false}

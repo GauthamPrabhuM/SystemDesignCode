@@ -1,0 +1,43 @@
+# ---------- env / secrets ----------
+.env
+.env.*
+!.env.example
+
+# ---------- node ----------
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+.vercel/
+
+# ---------- python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/
+
+# ---------- editors ----------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea/
+*.swp
+
+# ---------- os ----------
+.DS_Store
+Thumbs.db
+
+# ---------- build / runtime ----------
+dist/
+build/
+*.log
+pgdata/
+.docker/

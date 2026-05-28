@@ -1,0 +1,25 @@
+slug: parking-lot
+title: "Design a Parking Lot System"
+difficulty: medium
+category: lld
+time_limit_minutes: 90
+companies: [amazon, uber, atlassian, nutanix]
+tags: [oop, design-patterns, state-machine, concurrency]
+constraints:
+  max_floors: 10
+  vehicle_types: [motorcycle, car, truck, ev]
+  payment_modes: [hourly, monthly_pass, free]
+rubric:
+  dimensions:
+    correctness:     { weight: 40 }
+    oop_design:      { weight: 20 }
+    extensibility:   { weight: 15 }
+    concurrency:     { weight: 10 }
+    api_ergonomics:  { weight: 10 }
+    edge_cases:      { weight: 5  }
+  expected_patterns: [strategy, factory, observer]
+  red_flags:
+    - god_class
+    - hardcoded_pricing
+    - mutable_global_state
+    - missing_lock_on_park

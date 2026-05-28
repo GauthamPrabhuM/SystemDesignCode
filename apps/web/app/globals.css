@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: oklch(0.13 0 0);
+  --color-foreground: oklch(0.95 0 0);
+  --color-muted: oklch(0.20 0 0);
+  --color-muted-foreground: oklch(0.62 0 0);
+  --color-border: oklch(0.22 0 0);
+  --color-accent: oklch(0.24 0 0);
+  --color-accent-foreground: oklch(0.95 0 0);
+  --color-ring: oklch(0.55 0.18 250);
+
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+@layer base {
+  html, body, #__next { height: 100%; }
+  body {
+    font-family: var(--font-sans);
+    font-feature-settings: 'ss01', 'cv11';
+    text-rendering: optimizeLegibility;
+  }
+  ::selection { background: oklch(0.40 0.15 250 / 0.4); }
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-muted);
+    border-radius: 6px;
+    border: 2px solid var(--color-background);
+  }
+  *::-webkit-scrollbar-thumb:hover { background: var(--color-accent); }
+}
+
+/* Prose tweaks for problem statements */
+.prose-invert h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 0.5rem; }
+.prose-invert h2 { font-size: 1.05rem; font-weight: 600; margin-top: 1.25rem; }
+.prose-invert code {
+  background: var(--color-muted);
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+.prose-invert pre {
+  background: var(--color-muted);
+  padding: 0.75rem;
+  border-radius: 6px;
+  overflow-x: auto;
+}

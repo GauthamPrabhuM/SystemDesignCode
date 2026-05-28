@@ -8,6 +8,7 @@ const LANGUAGES: { id: Language; label: string }[] = [
   { id: 'cpp', label: 'C++' },
   { id: 'go', label: 'Go' },
   { id: 'typescript', label: 'TypeScript' },
+  { id: 'javascript', label: 'JavaScript' },
 ];
 
 export function LanguageSelector() {

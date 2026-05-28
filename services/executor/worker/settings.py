@@ -18,6 +18,7 @@ class Settings:
     SANDBOX_TIMEOUT_S: int = int(os.environ.get("SANDBOX_TIMEOUT_S", "10"))
     SANDBOX_TOTAL_TIMEOUT_S: int = int(os.environ.get("SANDBOX_TOTAL_TIMEOUT_S", "60"))
     DOCKER_HOST: str = os.environ.get("DOCKER_HOST", "unix:///var/run/docker.sock")
+    AI_REVIEW_MODEL: str = os.environ.get("AI_REVIEW_MODEL", "claude-sonnet-4-5")
 
 
 settings = Settings()

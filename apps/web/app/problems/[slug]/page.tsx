@@ -1,26 +1,13 @@
 'use client';
 
-/**
- * The IDE route: /problems/[slug]
- *
- * Layout:
- *   ┌──────────────────────────────────────────────────────────────────┐
- *   │  TopBar:  back  |  title       Timer  |  Run  Submit             │
- *   ├──────────────────────┬───────────────────────────────────────────┤
- *   │  ProblemPanel        │  EditorPanel                              │
- *   │  (Desc/Tests/...)    │  ┌──────────────────────────────────────┐ │
- *   │                      │  │ MonacoEditor                         │ │
- *   │                      │  └──────────────────────────────────────┘ │
- *   │                      │  Console / Tests / Output                 │
- *   └──────────────────────┴───────────────────────────────────────────┘
- */
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { Play, Send, ArrowLeft, Clock } from 'lucide-react';
 
-import { problems, submissions } from '@/lib/api';
+import { problems, submissions, ApiError } from '@/lib/api';
 import { streamSubmission, type SubmissionEvent } from '@/lib/ws';
 import { useEditor } from '@/lib/store/editor';
 import { ProblemPanel } from '@/components/problem/ProblemPanel';
@@ -31,9 +18,15 @@ import { CommandPalette } from '@/components/shared/CommandPalette';
 
 export default function ProblemIDE() {
   const { slug } = useParams<{ slug: string }>();
+  const router = useRouter();
   const { language, files, setFiles } = useEditor();
   const [events, setEvents] = useState<SubmissionEvent[]>([]);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const stopStreamRef = useRef<(() => void) | null>(null);
+
+  // Cleanup WS on unmount
+  useEffect(() => () => { stopStreamRef.current?.(); }, []);
 
   // Load problem
   const problemQ = useQuery({
@@ -41,11 +34,19 @@ export default function ProblemIDE() {
     queryFn: () => problems.get(slug),
   });
 
-  // Load starter when language changes (and no draft yet)
+  // Load starter when language changes and no code in editor yet
   useEffect(() => {
     if (Object.keys(files).length > 0) return;
-    problems.starter(slug, language).then((res) => setFiles(res.files));
-  }, [slug, language, files, setFiles]);
+    problems.starter(slug, language)
+      .then((res) => setFiles(res.files))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, language]);
+
+  const handleRun = () => {
+    setSubmitError(null);
+    submit.mutate();
+  };
 
   // Submit mutation
   const submit = useMutation({
@@ -58,31 +59,50 @@ export default function ProblemIDE() {
     onSuccess: (sub) => {
       setEvents([]);
       setSubmittingId(sub.id);
+      stopStreamRef.current?.(); // cancel any previous stream
+
       const token = localStorage.getItem('sdc-access-token') ?? '';
       const stop = streamSubmission(sub.id, token, {
         onEvent: (e) => setEvents((prev) => [...prev, e]),
-        onClose: () => setSubmittingId(null),
+        onClose: () => { setSubmittingId(null); stopStreamRef.current = null; },
       });
-      // Stop streaming when component unmounts
-      return () => stop();
+      stopStreamRef.current = stop;
+    },
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 401) {
+        router.push('/login');
+      } else {
+        setSubmitError(err instanceof Error ? err.message : 'Submission failed. Try again.');
+      }
     },
   });
 
-  // Keyboard shortcuts
+  // Keyboard shortcut ⌘↵ → run
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const cmd = e.metaKey || e.ctrlKey;
-      if (cmd && e.key === 'Enter') {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        submit.mutate();
+        handleRun();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [submit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  if (problemQ.isLoading) return <div className="grid h-screen place-items-center text-muted">Loading…</div>;
-  if (!problemQ.data) return <div className="grid h-screen place-items-center">Not found</div>;
+  if (problemQ.isLoading)
+    return <div className="grid h-screen place-items-center text-muted-foreground">Loading…</div>;
+  if (!problemQ.data)
+    return (
+      <div className="grid h-screen place-items-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">Problem not found.</p>
+          <Link href="/problems" className="mt-2 inline-block text-sm underline">
+            Browse problems
+          </Link>
+        </div>
+      </div>
+    );
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -90,12 +110,18 @@ export default function ProblemIDE() {
         title={problemQ.data.title}
         difficulty={problemQ.data.difficulty}
         timeLimit={problemQ.data.time_limit_minutes}
-        onRun={() => submit.mutate()}
-        onSubmit={() => submit.mutate()}
+        onRun={handleRun}
+        onSubmit={handleRun}
         submitting={submit.isPending || submittingId !== null}
       />
 
-      <PanelGroup direction="horizontal" className="flex-1">
+      {submitError && (
+        <div className="border-b border-rose-500/30 bg-rose-500/10 px-4 py-1.5 text-xs text-rose-300">
+          {submitError}
+        </div>
+      )}
+
+      <PanelGroup direction="horizontal" className="flex-1 overflow-hidden">
         <Panel defaultSize={35} minSize={20} maxSize={60}>
           <ProblemPanel problem={problemQ.data} />
         </Panel>
@@ -109,10 +135,10 @@ export default function ProblemIDE() {
                 <div className="flex items-center gap-2 border-b border-border px-3 py-1.5">
                   <LanguageSelector />
                   <div className="ml-auto text-xs text-muted-foreground">
-                    {Object.keys(files).length} file{Object.keys(files).length !== 1 && 's'}
+                    {Object.keys(files).length} file{Object.keys(files).length !== 1 ? 's' : ''}
                   </div>
                 </div>
-                <CodeEditor />
+                <CodeEditor slug={slug} />
               </div>
             </Panel>
 
@@ -125,7 +151,7 @@ export default function ProblemIDE() {
         </Panel>
       </PanelGroup>
 
-      <CommandPalette />
+      <CommandPalette onRun={handleRun} />
     </div>
   );
 }
@@ -146,13 +172,18 @@ function TopBar({
   submitting: boolean;
 }) {
   const diffColor =
-    difficulty === 'easy' ? 'text-emerald-400' : difficulty === 'medium' ? 'text-amber-400' : 'text-rose-400';
+    difficulty === 'easy'
+      ? 'text-emerald-400'
+      : difficulty === 'medium'
+      ? 'text-amber-400'
+      : 'text-rose-400';
+
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur">
-      <button className="rounded p-1 hover:bg-accent" aria-label="back">
+      <Link href="/problems" className="rounded p-1 hover:bg-accent" aria-label="Back to problems">
         <ArrowLeft className="h-4 w-4" />
-      </button>
-      <h1 className="font-medium text-sm">{title}</h1>
+      </Link>
+      <h1 className="text-sm font-medium">{title}</h1>
       <span className={`text-xs uppercase tracking-wide ${diffColor}`}>{difficulty}</span>
       <div className="ml-auto flex items-center gap-2">
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -161,6 +192,7 @@ function TopBar({
         <button
           onClick={onRun}
           disabled={submitting}
+          aria-label="run"
           className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1 text-xs hover:bg-accent disabled:opacity-50"
         >
           <Play className="h-3.5 w-3.5" /> Run

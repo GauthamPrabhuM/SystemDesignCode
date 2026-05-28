@@ -4,8 +4,8 @@ SystemDesignCode Executor Worker
 Consumes submission jobs from the Redis stream, runs them in isolated
 Docker containers, streams results back via Redis pubsub.
 
-Designed to scale horizontally: N workers can join the consumer group
-and Redis handles work distribution + recovery from crashed consumers.
+Also starts the AI review worker as a concurrent asyncio task when
+ANTHROPIC_API_KEY is set.
 """
 from __future__ import annotations
 
@@ -69,7 +69,6 @@ class Worker:
         while not self._stopping.is_set():
             await self.claim_stale()
             try:
-                # Block up to 5s waiting for new work
                 msgs = await self.redis.xreadgroup(
                     GROUP, CONSUMER, {STREAM: ">"}, count=1, block=5_000
                 )
@@ -86,7 +85,7 @@ class Worker:
                     await self._handle(msg_id, data)
 
         log.info("worker shutting down cleanly")
-        await self.redis.close()
+        await self.redis.aclose()
 
     async def _handle(self, msg_id: str, data: dict[str, Any]) -> None:
         try:
@@ -99,14 +98,38 @@ class Worker:
             log.exception("job.error msg_id=%s", msg_id)
             try:
                 await self.redis.xadd(DLQ, {"msg_id": msg_id, "err": str(e), "data": json.dumps(data)})
-                await self.redis.xack(STREAM, GROUP, msg_id)  # don't loop on poison
+                await self.redis.xack(STREAM, GROUP, msg_id)
             except Exception:
                 log.exception("dlq write failed")
 
 
+async def _run_ai_worker() -> None:
+    """Run AI review worker; silently exits if no API key is set."""
+    try:
+        import ai_worker
+        await ai_worker.main()
+    except Exception:
+        log.exception("ai_worker crashed")
+
+
+async def _main() -> None:
+    worker = Worker()
+
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        log.info("starting ai_worker alongside executor")
+        await asyncio.gather(
+            worker.run(),
+            _run_ai_worker(),
+            return_exceptions=True,
+        )
+    else:
+        log.warning("ANTHROPIC_API_KEY not set — AI reviews disabled")
+        await worker.run()
+
+
 def main() -> int:
     try:
-        asyncio.run(Worker().run())
+        asyncio.run(_main())
         return 0
     except KeyboardInterrupt:
         return 0

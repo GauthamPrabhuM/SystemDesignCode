@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { useEditor, type Language } from '@/lib/store/editor';
+import { drafts } from '@/lib/api';
 
 const LANGUAGE_MAP: Record<Language, string> = {
   python: 'python',
@@ -13,12 +14,15 @@ const LANGUAGE_MAP: Record<Language, string> = {
   javascript: 'javascript',
 };
 
-export function CodeEditor() {
+interface Props {
+  slug?: string;
+}
+
+export function CodeEditor({ slug }: Props) {
   const { activeFile, files, language, theme, setFile } = useEditor();
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   const handleMount: OnMount = (editor, monaco) => {
-    // Custom theme tuned to feel premium — dark mode default
     monaco.editor.defineTheme('sdc-dark', {
       base: 'vs-dark',
       inherit: true,
@@ -40,7 +44,6 @@ export function CodeEditor() {
     });
     monaco.editor.setTheme('sdc-dark');
 
-    // Make ⌘K open command palette instead of Monaco's
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, () => {
       window.dispatchEvent(new CustomEvent('sdc:open-command-palette'));
     });
@@ -49,10 +52,15 @@ export function CodeEditor() {
   const handleChange = (value: string | undefined) => {
     if (value === undefined) return;
     setFile(activeFile, value);
-    // Debounced draft autosave (1.5s)
+
+    if (!slug) return;
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      // TODO: PUT /drafts/{slug} — wire this once the route exists
+      const token = typeof window !== 'undefined' ? localStorage.getItem('sdc-access-token') : null;
+      if (!token) return;
+      const state = useEditor.getState();
+      const fileList = Object.entries(state.files).map(([path, contents]) => ({ path, contents }));
+      drafts.save(slug, state.language, fileList);
     }, 1500);
   };
 

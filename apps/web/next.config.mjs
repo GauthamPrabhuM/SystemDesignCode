@@ -1,10 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  experimental: {
-    typedRoutes: true,
-  },
-  // Monaco loads workers from same-origin; allow it
+  typedRoutes: true,
   webpack: (config) => {
     config.resolve.fallback = { ...config.resolve.fallback, fs: false };
     return config;

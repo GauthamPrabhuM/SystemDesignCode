@@ -3,13 +3,18 @@
 import { useEffect, useState } from 'react';
 import { Command } from 'cmdk';
 import { useRouter } from 'next/navigation';
-import { Play, Send, Sun, Moon, Search, FileText } from 'lucide-react';
+import { Play, Send, Moon, Sun, Search, FileText } from 'lucide-react';
 import { useEditor } from '@/lib/store/editor';
 
-export function CommandPalette() {
+interface Props {
+  onRun?: () => void;
+  onSubmit?: () => void;
+}
+
+export function CommandPalette({ onRun, onSubmit }: Props) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const { toggleTheme } = useEditor();
+  const { toggleTheme, theme } = useEditor();
 
   useEffect(() => {
     const onOpen = () => setOpen(true);
@@ -49,32 +54,42 @@ export function CommandPalette() {
         </Command.Empty>
 
         <Command.Group heading="Actions" className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          {onRun && (
+            <CommandItem
+              icon={<Play className="h-3.5 w-3.5" />}
+              shortcut="⌘↵"
+              onSelect={() => { setOpen(false); onRun(); }}
+            >
+              Run code
+            </CommandItem>
+          )}
+          {onSubmit && (
+            <CommandItem
+              icon={<Send className="h-3.5 w-3.5" />}
+              onSelect={() => { setOpen(false); onSubmit(); }}
+            >
+              Submit
+            </CommandItem>
+          )}
           <CommandItem
-            icon={<Play className="h-3.5 w-3.5" />}
-            shortcut="⌘↵"
-            onSelect={() => {
-              setOpen(false);
-              // Reuse the same global event the editor binds
-              document
-                .querySelector<HTMLButtonElement>('button[aria-label="run"]')
-                ?.click();
-            }}
+            icon={theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+            onSelect={() => { toggleTheme(); setOpen(false); }}
           >
-            Run code
-          </CommandItem>
-          <CommandItem icon={<Send className="h-3.5 w-3.5" />} shortcut="⌘⇧↵" onSelect={() => setOpen(false)}>
-            Submit
-          </CommandItem>
-          <CommandItem icon={<Moon className="h-3.5 w-3.5" />} onSelect={() => { toggleTheme(); setOpen(false); }}>
             Toggle theme
           </CommandItem>
         </Command.Group>
 
         <Command.Group heading="Navigate">
-          <CommandItem icon={<FileText className="h-3.5 w-3.5" />} onSelect={() => { router.push('/dashboard'); setOpen(false); }}>
+          <CommandItem
+            icon={<FileText className="h-3.5 w-3.5" />}
+            onSelect={() => { router.push('/dashboard'); setOpen(false); }}
+          >
             Dashboard
           </CommandItem>
-          <CommandItem icon={<FileText className="h-3.5 w-3.5" />} onSelect={() => { router.push('/problems'); setOpen(false); }}>
+          <CommandItem
+            icon={<FileText className="h-3.5 w-3.5" />}
+            onSelect={() => { router.push('/problems'); setOpen(false); }}
+          >
             All problems
           </CommandItem>
         </Command.Group>

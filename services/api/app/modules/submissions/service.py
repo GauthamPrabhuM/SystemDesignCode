@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -45,13 +45,15 @@ async def create_submission(
     _validate_files(files)
     await _quota_check(user_id, user_plan)
 
-    problem = await db.scalar(select(Problem).where(Problem.slug == problem_slug, Problem.is_published))
+    problem = await db.scalar(
+        select(Problem).where(Problem.slug == problem_slug, Problem.is_published.is_(True))
+    )
     if not problem:
         raise NotFound("Problem not found")
 
     total_tests = await db.scalar(
-        select(TestCase.id).where(TestCase.problem_id == problem.id).with_only_columns(TestCase.id).count()
-    )
+        select(func.count()).select_from(TestCase).where(TestCase.problem_id == problem.id)
+    ) or 0
 
     sub = Submission(
         user_id=user_id,
@@ -59,7 +61,7 @@ async def create_submission(
         language=language,
         files=files,
         status="queued",
-        total_tests=total_tests or 0,
+        total_tests=total_tests,
     )
     db.add(sub)
     await db.commit()

@@ -149,7 +149,7 @@ async def handle_one(client: anthropic.AsyncAnthropic, redis: Redis, pg: asyncpg
 Use the design_review tool to deliver a structured review."""
 
     resp = await client.messages.create(
-        model=settings.AI_REVIEW_MODEL if hasattr(settings, "AI_REVIEW_MODEL") else "claude-sonnet-4-5",
+        model=settings.AI_REVIEW_MODEL,
         max_tokens=2000,
         system=SYSTEM_PROMPT,
         tools=[REVIEW_SCHEMA],

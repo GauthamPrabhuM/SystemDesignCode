@@ -1,5 +1,5 @@
 app = "sdc-api"
-primary_region = "bom"   # Mumbai — change to your audience's region
+primary_region = "bom"   # Mumbai — change: sin=Singapore, lax=LA, lhr=London, iad=US-East
 
 [build]
   dockerfile = "Dockerfile"
@@ -10,21 +10,21 @@ primary_region = "bom"   # Mumbai — change to your audience's region
 [http_service]
   internal_port = 8000
   force_https = true
-  auto_stop_machines = false   # keep API warm
+  auto_stop_machines = false   # keep API warm; set true to save money if latency is OK
   auto_start_machines = true
   min_machines_running = 1
   processes = ["app"]
 
 [[http_service.checks]]
-  grace_period = "10s"
+  grace_period = "15s"
   interval = "15s"
   method = "GET"
-  timeout = "3s"
+  timeout = "5s"
   path = "/healthz"
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "256mb"
+  memory = "512mb"   # 256mb OOMs on alembic + uvicorn startup together
 
 [deploy]
-  release_command = "alembic upgrade head"
+  release_command = "sh -c 'export PYTHONPATH=/app && alembic upgrade head && python scripts/load_problems.py /problems'"

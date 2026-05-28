@@ -7,7 +7,6 @@ Idempotent: re-running upserts based on slug. Run at API startup or via:
 from __future__ import annotations
 
 import asyncio
-import json
 import sys
 from pathlib import Path
 
@@ -16,7 +15,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.db.session import SessionLocal
-from app.modules.problems.models import Problem, StarterTemplate, TestCase
+from app.modules.problems.models import Problem, StarterTemplate, TestCase, TestResult
 
 
 async def load_one(session, root: Path) -> None:
@@ -27,31 +26,32 @@ async def load_one(session, root: Path) -> None:
     statement = (root / "statement.md").read_text() if (root / "statement.md").exists() else ""
 
     # Upsert problem
-    stmt = pg_insert(Problem.__table__).values(
-        slug=meta["slug"],
-        title=meta["title"],
-        difficulty=meta.get("difficulty", "medium"),
-        category=meta.get("category", "lld"),
-        statement_md=statement,
-        constraints=meta.get("constraints", {}),
-        time_limit_minutes=meta.get("time_limit_minutes", 90),
-        is_premium=meta.get("is_premium", False),
-        is_published=True,
-        rubric=meta.get("rubric"),
-    ).on_conflict_do_update(
-        index_elements=["slug"],
-        set_={
-            "title": meta["title"],
-            "difficulty": meta.get("difficulty", "medium"),
-            "category": meta.get("category", "lld"),
-            "statement_md": statement,
-            "constraints": meta.get("constraints", {}),
-            "time_limit_minutes": meta.get("time_limit_minutes", 90),
-            "is_premium": meta.get("is_premium", False),
-            "rubric": meta.get("rubric"),
-        },
-    ).returning(Problem.__table__.c.id)
-    result = await session.execute(stmt)
+    result = await session.execute(
+        pg_insert(Problem.__table__).values(
+            slug=meta["slug"],
+            title=meta["title"],
+            difficulty=meta.get("difficulty", "medium"),
+            category=meta.get("category", "lld"),
+            statement_md=statement,
+            constraints=meta.get("constraints", {}),
+            time_limit_minutes=meta.get("time_limit_minutes", 90),
+            is_premium=meta.get("is_premium", False),
+            is_published=True,
+            rubric=meta.get("rubric"),
+        ).on_conflict_do_update(
+            index_elements=["slug"],
+            set_={
+                "title": meta["title"],
+                "difficulty": meta.get("difficulty", "medium"),
+                "category": meta.get("category", "lld"),
+                "statement_md": statement,
+                "constraints": meta.get("constraints", {}),
+                "time_limit_minutes": meta.get("time_limit_minutes", 90),
+                "is_premium": meta.get("is_premium", False),
+                "rubric": meta.get("rubric"),
+            },
+        ).returning(Problem.__table__.c.id)
+    )
     problem_id = result.scalar_one()
 
     # Replace starter templates
@@ -60,7 +60,7 @@ async def load_one(session, root: Path) -> None:
     )
     starter_root = root / "starter"
     if starter_root.exists():
-        for lang_dir in starter_root.iterdir():
+        for lang_dir in sorted(starter_root.iterdir()):
             if not lang_dir.is_dir():
                 continue
             files = []
@@ -77,8 +77,20 @@ async def load_one(session, root: Path) -> None:
                         language=lang_dir.name,
                         files=files,
                         entrypoint=entrypoint or files[0]["path"],
+                    ).on_conflict_do_update(
+                        index_elements=["problem_id", "language"],
+                        set_={"files": files, "entrypoint": entrypoint or files[0]["path"]},
                     )
                 )
+
+    # Delete test_results first (FK: test_results.test_case_id → test_cases.id, no CASCADE)
+    existing_tc_ids = (await session.execute(
+        select(TestCase.id).where(TestCase.problem_id == problem_id)
+    )).scalars().all()
+    if existing_tc_ids:
+        await session.execute(
+            delete(TestResult.__table__).where(TestResult.__table__.c.test_case_id.in_(existing_tc_ids))
+        )
 
     # Replace test cases
     await session.execute(
@@ -86,8 +98,7 @@ async def load_one(session, root: Path) -> None:
     )
     cases_path = root / "tests" / "cases.yaml"
     if cases_path.exists():
-        cases = yaml.safe_load(cases_path.read_text()) or []
-        for c in cases:
+        for c in (yaml.safe_load(cases_path.read_text()) or []):
             await session.execute(
                 pg_insert(TestCase.__table__).values(
                     problem_id=problem_id,
@@ -100,6 +111,8 @@ async def load_one(session, root: Path) -> None:
                 )
             )
 
+    # Commit per-problem so a single failure doesn't cascade
+    await session.commit()
     print(f"  loaded: {meta['slug']}")
 
 
@@ -111,11 +124,10 @@ async def main(root: Path) -> None:
                 try:
                     await load_one(session, problem_dir)
                 except Exception as e:
+                    await session.rollback()
                     print(f"  ! failed {problem_dir.name}: {e}")
-        await session.commit()
     print("done.")
 
 
 if __name__ == "__main__":
-    root = Path(sys.argv[1] if len(sys.argv) > 1 else "/problems")
-    asyncio.run(main(root))
+    asyncio.run(main(Path(sys.argv[1] if len(sys.argv) > 1 else "/problems")))

@@ -1,0 +1,120 @@
+- name: basic_set_get
+  kind: public
+  weight: 1
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: set, key: x, value: 1, now_ms: 0}
+      - {op: get, key: x, now_ms: 0}
+      - {op: get, key: missing, now_ms: 0}
+  expected:
+    responses:
+      - {ok: true}
+      - {value: 1}
+      - {value: null}
+
+- name: ttl_expiry
+  kind: public
+  weight: 3
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: set, key: y, value: hello, ttl_ms: 500, now_ms: 0}
+      - {op: get, key: y, now_ms: 499}
+      - {op: get, key: y, now_ms: 500}
+      - {op: get, key: y, now_ms: 501}
+  expected:
+    responses:
+      - {ok: true}
+      - {value: hello}
+      - {value: null}
+      - {value: null}
+
+- name: ttl_query
+  kind: public
+  weight: 2
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: set, key: a, value: 1, now_ms: 0}
+      - {op: set, key: b, value: 2, ttl_ms: 1000, now_ms: 0}
+      - {op: ttl, key: a, now_ms: 0}
+      - {op: ttl, key: b, now_ms: 300}
+      - {op: ttl, key: missing, now_ms: 0}
+  expected:
+    responses:
+      - {ok: true}
+      - {ok: true}
+      - {ttl_ms: -1}
+      - {ttl_ms: 700}
+      - {ttl_ms: -2}
+
+- name: delete_key
+  kind: public
+  weight: 1
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: set,    key: k, value: v, now_ms: 0}
+      - {op: delete, key: k}
+      - {op: get,    key: k, now_ms: 0}
+      - {op: delete, key: k}
+  expected:
+    responses:
+      - {ok: true}
+      - {deleted: true}
+      - {value: null}
+      - {deleted: false}
+
+- name: keys_filters_expired
+  kind: public
+  weight: 2
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: set, key: a, value: 1, now_ms: 0}
+      - {op: set, key: b, value: 2, ttl_ms: 100, now_ms: 0}
+      - {op: set, key: c, value: 3, now_ms: 0}
+      - {op: keys, now_ms: 50}
+      - {op: keys, now_ms: 200}
+  expected:
+    responses:
+      - {ok: true}
+      - {ok: true}
+      - {ok: true}
+      - {keys: [a, b, c]}
+      - {keys: [a, c]}
+
+- name: overwrite_resets_ttl
+  kind: hidden
+  weight: 3
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: set, key: x, value: 1, ttl_ms: 100, now_ms: 0}
+      - {op: set, key: x, value: 2, now_ms: 50}
+      - {op: get, key: x, now_ms: 200}
+      - {op: ttl, key: x, now_ms: 200}
+  expected:
+    responses:
+      - {ok: true}
+      - {ok: true}
+      - {value: 2}
+      - {ttl_ms: -1}
+
+- name: flush_all
+  kind: hidden
+  weight: 2
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: set,   key: a, value: 1, now_ms: 0}
+      - {op: set,   key: b, value: 2, now_ms: 0}
+      - {op: flush}
+      - {op: keys,  now_ms: 0}
+  expected:
+    responses:
+      - {ok: true}
+      - {ok: true}
+      - {ok: true}
+      - {keys: []}

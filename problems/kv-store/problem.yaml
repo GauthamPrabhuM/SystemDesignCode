@@ -1,0 +1,20 @@
+slug: kv-store
+title: Design an In-Memory Key-Value Store
+difficulty: hard
+category: distsys
+time_limit_minutes: 90
+is_premium: false
+
+rubric:
+  solid:
+    - Single responsibility: TTL management separate from storage
+    - Interface segregation: read vs write ops clearly separated
+  patterns:
+    - Strategy for eviction policy (LRU, LFU, TTL-based)
+    - Decorator for TTL wrapper around core store
+  correctness:
+    - Expired keys not returned, even if not explicitly cleaned up
+    - TTL updated correctly on overwrite
+  extensibility:
+    - Pluggable eviction policies
+    - Could shard by key hash for distributed use

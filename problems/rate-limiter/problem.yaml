@@ -1,0 +1,22 @@
+slug: rate-limiter
+title: Design a Rate Limiter
+difficulty: hard
+category: machine-coding
+time_limit_minutes: 90
+is_premium: false
+
+rubric:
+  solid:
+    - Single responsibility: limiter logic separate from storage
+    - Strategy pattern for pluggable algorithms (token bucket / sliding window)
+  patterns:
+    - Token Bucket or Sliding Window Counter
+    - Decorator pattern to wrap any service with rate limiting
+  extensibility:
+    - Easy to add per-route or per-IP limits
+    - Algorithm swappable without changing client code
+  concurrency:
+    - Thread-safe allow() with locks or atomic operations
+  correctness:
+    - Correct window reset / token refill timing
+    - Handles burst vs sustained traffic correctly

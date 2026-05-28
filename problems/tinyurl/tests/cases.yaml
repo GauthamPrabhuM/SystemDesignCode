@@ -1,0 +1,94 @@
+- name: custom_alias_roundtrip
+  kind: public
+  weight: 2
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: shorten, url: "https://github.com", alias: "gh"}
+      - {op: expand,  code: "gh"}
+  expected:
+    responses:
+      - {code: "gh"}
+      - {url: "https://github.com"}
+
+- name: expand_missing_returns_null
+  kind: public
+  weight: 1
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: expand, code: "doesnt"}
+  expected:
+    responses:
+      - {url: null}
+
+- name: click_stats
+  kind: public
+  weight: 2
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: shorten, url: "https://example.com", alias: "ex"}
+      - {op: expand,  code: "ex"}
+      - {op: expand,  code: "ex"}
+      - {op: stats,   code: "ex"}
+  expected:
+    responses:
+      - {code: "ex"}
+      - {url: "https://example.com"}
+      - {url: "https://example.com"}
+      - {clicks: 2}
+
+- name: delete_url
+  kind: public
+  weight: 2
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: shorten, url: "https://delete.me", alias: "del"}
+      - {op: delete,  code: "del"}
+      - {op: expand,  code: "del"}
+      - {op: delete,  code: "del"}
+  expected:
+    responses:
+      - {code: "del"}
+      - {deleted: true}
+      - {url: null}
+      - {deleted: false}
+
+- name: duplicate_alias_fails
+  kind: public
+  weight: 2
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: shorten, url: "https://first.com",  alias: "abc"}
+      - {op: shorten, url: "https://second.com", alias: "abc"}
+  expected:
+    responses:
+      - {code: "abc"}
+      - {error: "alias taken"}
+
+- name: shorten_generates_6char_code
+  kind: hidden
+  weight: 3
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: shorten, url: "https://longurl.com/path/to/something?query=value"}
+      - {op: shorten, url: "https://another.com"}
+  expected:
+    all_codes_length_6: true
+
+- name: stats_zero_before_expand
+  kind: hidden
+  weight: 2
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: shorten, url: "https://zero.com", alias: "z0"}
+      - {op: stats,   code: "z0"}
+  expected:
+    responses:
+      - {code: "z0"}
+      - {clicks: 0}

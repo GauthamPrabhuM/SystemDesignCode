@@ -10,6 +10,7 @@ import { Play, Send, ArrowLeft, Clock } from 'lucide-react';
 import { problems, submissions, ApiError } from '@/lib/api';
 import { streamSubmission, type SubmissionEvent } from '@/lib/ws';
 import { useEditor } from '@/lib/store/editor';
+// useEditor.getState() gives non-reactive access for imperative reset
 import { ProblemPanel } from '@/components/problem/ProblemPanel';
 import { CodeEditor } from '@/components/editor/CodeEditor';
 import { ConsolePanel } from '@/components/execution/ConsolePanel';
@@ -34,12 +35,17 @@ export default function ProblemIDE() {
     queryFn: () => problems.get(slug),
   });
 
-  // Load starter when language changes and no code in editor yet
+  const [starterError, setStarterError] = useState<string | null>(null);
+
+  // Reset editor and load starter whenever slug OR language changes
   useEffect(() => {
-    if (Object.keys(files).length > 0) return;
+    setStarterError(null);
+    useEditor.getState().reset();
     problems.starter(slug, language)
       .then((res) => setFiles(res.files))
-      .catch(() => {});
+      .catch(() => {
+        setStarterError(`No ${language} starter yet. Write your solution from scratch or switch to Python.`);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, language]);
 
@@ -115,9 +121,9 @@ export default function ProblemIDE() {
         submitting={submit.isPending || submittingId !== null}
       />
 
-      {submitError && (
+      {(submitError || starterError) && (
         <div className="border-b border-rose-500/30 bg-rose-500/10 px-4 py-1.5 text-xs text-rose-300">
-          {submitError}
+          {submitError || starterError}
         </div>
       )}
 

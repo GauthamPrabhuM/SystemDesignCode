@@ -1,0 +1,111 @@
+- name: two_person_split
+  kind: public
+  weight: 2
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: add_member, name: Alice}
+      - {op: add_member, name: Bob}
+      - {op: add_expense, payer: Alice, amount: 100, split_among: [Alice, Bob]}
+      - {op: balance, member: Alice}
+      - {op: balance, member: Bob}
+  expected:
+    responses:
+      - {ok: true}
+      - {ok: true}
+      - {ok: true}
+      - {balance: 50}
+      - {balance: -50}
+
+- name: three_person_split
+  kind: public
+  weight: 2
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: add_member, name: Alice}
+      - {op: add_member, name: Bob}
+      - {op: add_member, name: Carol}
+      - {op: add_expense, payer: Alice, amount: 300, split_among: [Alice, Bob, Carol]}
+      - {op: balances}
+  expected:
+    responses:
+      - {ok: true}
+      - {ok: true}
+      - {ok: true}
+      - {ok: true}
+      - {balances: {Alice: 200, Bob: -100, Carol: -100}}
+
+- name: settle_clears_debt
+  kind: public
+  weight: 2
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: add_member, name: Alice}
+      - {op: add_member, name: Bob}
+      - {op: add_expense, payer: Alice, amount: 200, split_among: [Alice, Bob]}
+      - {op: settle, from_member: Bob, to_member: Alice, amount: 100}
+      - {op: balance, member: Bob}
+      - {op: balance, member: Alice}
+  expected:
+    responses:
+      - {ok: true}
+      - {ok: true}
+      - {ok: true}
+      - {ok: true}
+      - {balance: 0}
+      - {balance: 0}
+
+- name: exact_split
+  kind: public
+  weight: 2
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: add_member, name: Alice}
+      - {op: add_member, name: Bob}
+      - {op: add_member, name: Carol}
+      - {op: add_expense_exact, payer: Alice, shares: {Alice: 50, Bob: 120, Carol: 30}}
+      - {op: balance, member: Alice}
+      - {op: balance, member: Bob}
+      - {op: balance, member: Carol}
+  expected:
+    responses:
+      - {ok: true}
+      - {ok: true}
+      - {ok: true}
+      - {ok: true}
+      - {balance: 150}
+      - {balance: -120}
+      - {balance: -30}
+
+- name: balances_sum_to_zero
+  kind: public
+  weight: 1
+  timeout_ms: 3000
+  input:
+    commands:
+      - {op: add_member, name: A}
+      - {op: add_member, name: B}
+      - {op: add_member, name: C}
+      - {op: add_expense, payer: A, amount: 90, split_among: [A, B, C]}
+      - {op: add_expense, payer: B, amount: 60, split_among: [A, B]}
+      - {op: balances}
+  expected:
+    balances_sum_zero: true
+
+- name: simplify_debts
+  kind: hidden
+  weight: 4
+  timeout_ms: 5000
+  input:
+    commands:
+      - {op: add_member, name: A}
+      - {op: add_member, name: B}
+      - {op: add_member, name: C}
+      - {op: add_expense, payer: A, amount: 90,  split_among: [A, B, C]}
+      - {op: add_expense, payer: B, amount: 60,  split_among: [B, C]}
+      - {op: simplify}
+  expected:
+    simplify_valid: true

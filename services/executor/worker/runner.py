@@ -117,17 +117,31 @@ class SandboxRunner:
                 total_runtime_ms += int(res["runtime_ms"])
                 max_memory_kb = max(max_memory_kb, res.get("memory_kb", 0))
 
+                # Stream stderr (print statements, debug output) to Console tab
+                if res["stderr"].strip():
+                    await emit({
+                        "type": "log", "stream": "stderr",
+                        "line": res["stderr"].strip()[-2000:],
+                        "test": tc["name"],
+                    })
+
                 if res["exit_code"] != 0:
-                    status = "error" if res["exit_code"] != 124 else "timeout"
-                    await self._save_test_result(sub_id, tc["id"], status, res)
+                    err_status = "error" if res["exit_code"] != 124 else "timeout"
+                    await self._save_test_result(sub_id, tc["id"], err_status, res)
                     await emit({
                         "type": "test", "test_id": str(tc["id"]), "name": tc["name"],
-                        "status": status, "runtime_ms": res["runtime_ms"],
+                        "status": err_status, "runtime_ms": res["runtime_ms"],
                         "stderr": res["stderr"][-1000:],
                     })
                     continue
 
-                # Compare stdout vs expected (problem-defined JSON)
+                # Stream any extra stdout lines (non-JSON debug prints) to Console tab
+                stdout_lines = res["stdout"].strip().splitlines()
+                for line in stdout_lines[:-1]:  # all lines except the last JSON answer
+                    if line.strip():
+                        await emit({"type": "log", "stream": "stdout", "line": line, "test": tc["name"]})
+
+                # Compare last JSON line vs expected
                 actual = self._try_parse_json(res["stdout"])
                 expected = tc["expected"]
                 test_status = "passed" if actual == expected else "failed"
@@ -140,6 +154,7 @@ class SandboxRunner:
                     "type": "test", "test_id": str(tc["id"]), "name": tc["name"],
                     "status": test_status, "runtime_ms": res["runtime_ms"],
                     "diff": diff,
+                    "stdout": res["stdout"].strip()[-500:] if test_status == "failed" else None,
                 })
 
             total_weight = sum(t["weight"] for t in test_cases) or 1

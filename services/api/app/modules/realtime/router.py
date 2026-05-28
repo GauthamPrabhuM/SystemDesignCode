@@ -1,10 +1,10 @@
-"""WebSocket endpoints — submission streaming + interview collaboration.
+"""WebSocket — submission event streaming.
 
-Pattern: each WS connection subscribes to a Redis pubsub channel scoped to
-the resource (submission_id / interview room). The executor publishes events
-to that channel; this hub fans them out to connected clients.
-
-This keeps the WS hub stateless (any API replica can serve any client).
+Protocol:
+  Client connects with ?access_token=<jwt>
+  Server replays backlog → subscribes to live Redis pubsub channel.
+  Server closes once terminal (result/failed/timeout) + AI review arrive,
+  or after AI_REVIEW_GRACE_S seconds post-terminal with no AI review.
 """
 from __future__ import annotations
 
@@ -14,7 +14,6 @@ import logging
 from uuid import UUID
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decode_access_token
 from app.db.redis import redis
@@ -24,9 +23,10 @@ from app.modules.problems.models import Submission
 log = logging.getLogger(__name__)
 router = APIRouter()
 
+AI_REVIEW_GRACE_S = 30
+
 
 async def _authenticate_ws(websocket: WebSocket) -> UUID | None:
-    """Returns user_id or None (and closes socket) if auth fails."""
     token = websocket.query_params.get("access_token")
     if not token:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
@@ -41,60 +41,84 @@ async def _authenticate_ws(websocket: WebSocket) -> UUID | None:
 
 @router.websocket("/submissions/{submission_id}/stream")
 async def submission_stream(websocket: WebSocket, submission_id: UUID):
-    """Stream a submission's events: status, log, test, result, ai_review_done.
-
-    Protocol:
-        Client connects with ?access_token=<jwt>
-        Server replays any cached events (LRANGE), then subscribes to live channel.
-        Server emits JSON lines.
-    """
     user_id = await _authenticate_ws(websocket)
     if user_id is None:
         return
 
-    # Authorize: user must own the submission
-    async with SessionLocal() as db:  # type: AsyncSession
+    async with SessionLocal() as db:
         sub = await db.get(Submission, submission_id)
         if not sub or sub.user_id != user_id:
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
 
     await websocket.accept()
+
     channel = f"submission:{submission_id}"
     backlog_key = f"submission:{submission_id}:events"
-
     pubsub = redis.pubsub()
-    try:
-        # 1) Replay backlog so clients that connect late don't miss "running"
-        backlog = await redis.lrange(backlog_key, 0, -1)
-        for raw in backlog:
-            await websocket.send_text(raw)
 
-        # 2) Subscribe live
-        await pubsub.subscribe(channel)
-        async for msg in pubsub.listen():
-            if msg.get("type") != "message":
-                continue
-            data = msg["data"]
-            await websocket.send_text(data if isinstance(data, str) else data.decode())
-            # Close socket on terminal event so the client knows to stop waiting.
-            try:
-                event = json.loads(data)
-                if event.get("type") in ("result", "failed", "timeout"):
-                    # Let AI review event come through afterward; don't auto-close.
-                    pass
-            except Exception:
-                pass
-    except WebSocketDisconnect:
-        pass
-    except Exception:
-        log.exception("ws.submission_stream.error", extra={"submission_id": str(submission_id)})
-    finally:
+    # Event that signals the main loop to stop (terminal event received)
+    terminal_event = asyncio.Event()
+    done_event = asyncio.Event()  # set when we should close completely
+
+    async def _send(text: str) -> None:
+        """Send to WS and track terminal/ai events."""
+        await websocket.send_text(text)
         try:
-            await pubsub.unsubscribe(channel)
-            await pubsub.close()
+            ev = json.loads(text)
+            etype = ev.get("type")
+            if etype in ("result", "failed", "timeout"):
+                terminal_event.set()
+            if etype == "ai_review_done":
+                done_event.set()
+                terminal_event.set()
         except Exception:
             pass
 
+    async def _listen() -> None:
+        """Forward pubsub messages to the WebSocket until done."""
+        await pubsub.subscribe(channel)
+        try:
+            async for msg in pubsub.listen():
+                if done_event.is_set():
+                    break
+                if msg.get("type") != "message":
+                    continue
+                data = msg["data"]
+                text = data if isinstance(data, str) else data.decode()
+                await _send(text)
+        except Exception:
+            pass
 
-# Interview room WS would go here — Yjs sync handled by a separate handler.
+    async def _timeout_after_terminal() -> None:
+        """After terminal event, wait AI_REVIEW_GRACE_S then close."""
+        await terminal_event.wait()
+        if not done_event.is_set():
+            await asyncio.sleep(AI_REVIEW_GRACE_S)
+        done_event.set()
+
+    try:
+        # Replay backlog for clients that connect after execution started
+        for raw in await redis.lrange(backlog_key, 0, -1):
+            text = raw if isinstance(raw, str) else raw.decode()
+            await _send(text)
+
+        if not done_event.is_set():
+            # Run listener + timeout concurrently; whichever ends first wins
+            listener_task = asyncio.create_task(_listen())
+            timeout_task = asyncio.create_task(_timeout_after_terminal())
+            await done_event.wait()
+            listener_task.cancel()
+            timeout_task.cancel()
+            await asyncio.gather(listener_task, timeout_task, return_exceptions=True)
+
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        log.exception("ws.error sid=%s", submission_id)
+    finally:
+        try:
+            await pubsub.unsubscribe(channel)
+            await pubsub.aclose()
+        except Exception:
+            pass

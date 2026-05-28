@@ -6,7 +6,7 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:8000';
 
 export type SubmissionEvent =
   | { type: 'status'; status: 'queued' | 'running' | 'done' | 'failed' }
-  | { type: 'log'; stream: 'stdout' | 'stderr'; line: string }
+  | { type: 'log'; stream: 'stdout' | 'stderr'; line: string; test?: string }
   | {
       type: 'test';
       test_id: string;
@@ -15,6 +15,7 @@ export type SubmissionEvent =
       runtime_ms: number;
       diff?: string;
       stderr?: string;
+      stdout?: string;
     }
   | {
       type: 'result';

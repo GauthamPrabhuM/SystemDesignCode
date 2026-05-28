@@ -1,18 +1,22 @@
-"""Starter template — Parking Lot.
+"""Parking Lot — starter solution.
 
-Fill in the marked sections. Your program reads JSON commands from stdin
-(one per line) and writes JSON responses to stdout (one per line).
+The runner sends one JSON object to stdin:
+  {"commands": [{"op": "park", "vehicle": {...}, "ts": ...}, ...]}
+
+Your program must write one JSON object to stdout:
+  {"responses": [{"ticket": "T-1"}, ...]}
+
+One response per command, in the same order.
 """
 from __future__ import annotations
 
 import json
 import sys
 import threading
-from dataclasses import dataclass, field
-from typing import Protocol
+from dataclasses import dataclass
+from typing import Any, Protocol
 
 
-# --- Domain ---------------------------------------------------------------
 @dataclass
 class Vehicle:
     license: str
@@ -27,7 +31,6 @@ class Ticket:
     entry_ts: int
 
 
-# --- Pricing strategy -----------------------------------------------------
 class PricingStrategy(Protocol):
     def calculate(self, ticket: Ticket, exit_ts: int) -> int: ...
 
@@ -41,7 +44,6 @@ class HourlyPricing:
         return hours * self.RATES.get(ticket.vehicle.type, 50)
 
 
-# --- Service --------------------------------------------------------------
 class ParkingLotService:
     def __init__(self, floors: int, spots_per_floor: int, pricing: PricingStrategy) -> None:
         self._lock = threading.Lock()
@@ -73,25 +75,26 @@ class ParkingLotService:
         return sum(1 for s in self._spots if s)
 
 
-# --- IO loop --------------------------------------------------------------
 def main() -> None:
+    data = json.load(sys.stdin)
+    commands = data.get("commands", [])
     svc = ParkingLotService(floors=3, spots_per_floor=10, pricing=HourlyPricing())
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
-        cmd = json.loads(line)
+    responses: list[Any] = []
+
+    for cmd in commands:
         op = cmd["op"]
         if op == "park":
             tk = svc.park(Vehicle(**cmd["vehicle"]), cmd["ts"])
-            print(json.dumps({"ticket": tk.id if tk else None}), flush=True)
+            responses.append({"ticket": tk.id if tk else None})
         elif op == "unpark":
             bill = svc.unpark(cmd["ticket"], cmd["ts"])
-            print(json.dumps({"bill": bill}), flush=True)
+            responses.append({"bill": bill})
         elif op == "free_spots":
-            print(json.dumps({"free": svc.free_spots(cmd.get("vehicle_type"))}), flush=True)
+            responses.append({"free": svc.free_spots(cmd.get("vehicle_type"))})
         else:
-            print(json.dumps({"error": f"unknown op: {op}"}), flush=True)
+            responses.append({"error": f"unknown op: {op}"})
+
+    print(json.dumps({"responses": responses}))
 
 
 if __name__ == "__main__":

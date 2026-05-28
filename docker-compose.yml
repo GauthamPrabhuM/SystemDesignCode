@@ -73,6 +73,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./services/executor:/app
+      - /tmp:/tmp   # sibling containers bind-mount from this path; must match host
 
   web:
     build:

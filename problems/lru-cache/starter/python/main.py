@@ -1,9 +1,18 @@
-"""Starter — LRU Cache. Build a HashMap + doubly-linked-list yourself."""
+"""LRU Cache — starter solution.
+
+The runner sends one JSON object to stdin:
+  {"commands": [{"op": "init", "capacity": 2}, {"op": "put", ...}, ...]}
+
+Your program must write one JSON object to stdout:
+  {"responses": [{"ok": true}, ...]}
+
+One response per command, in the same order.
+"""
 from __future__ import annotations
 
 import json
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -19,7 +28,6 @@ class LRUCache:
     def __init__(self, capacity: int) -> None:
         self.capacity = capacity
         self._map: dict[Any, Node] = {}
-        # Sentinel head and tail to avoid edge cases
         self._head = Node(None, None)
         self._tail = Node(None, None)
         self._head.next = self._tail
@@ -71,31 +79,33 @@ class LRUCache:
 
 
 def main() -> None:
+    data = json.load(sys.stdin)
+    commands = data.get("commands", [])
     cache: LRUCache | None = None
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
-        cmd = json.loads(line)
+    responses: list[Any] = []
+
+    for cmd in commands:
         op = cmd["op"]
         if op == "init":
             cache = LRUCache(cmd["capacity"])
-            print(json.dumps({"ok": True}), flush=True)
+            responses.append({"ok": True})
         elif op == "put":
-            assert cache
+            assert cache is not None
             cache.put(cmd["key"], cmd["value"])
-            print(json.dumps({"ok": True}), flush=True)
+            responses.append({"ok": True})
         elif op == "get":
-            assert cache
-            print(json.dumps({"value": cache.get(cmd["key"])}), flush=True)
+            assert cache is not None
+            responses.append({"value": cache.get(cmd["key"])})
         elif op == "delete":
-            assert cache
-            print(json.dumps({"existed": cache.delete(cmd["key"])}), flush=True)
+            assert cache is not None
+            responses.append({"existed": cache.delete(cmd["key"])})
         elif op == "size":
-            assert cache
-            print(json.dumps({"size": cache.size()}), flush=True)
+            assert cache is not None
+            responses.append({"size": cache.size()})
         else:
-            print(json.dumps({"error": f"unknown op: {op}"}), flush=True)
+            responses.append({"error": f"unknown op: {op}"})
+
+    print(json.dumps({"responses": responses}))
 
 
 if __name__ == "__main__":

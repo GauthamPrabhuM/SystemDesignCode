@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { Toaster } from 'sonner';
 import { auth, setAccessToken } from '@/lib/api';
 import { useAuth } from '@/lib/store/auth';
 
@@ -41,6 +42,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={client}>
       <AuthInit />
       {children}
+      <Toaster theme="dark" position="bottom-right" richColors closeButton />
     </QueryClientProvider>
   );
 }

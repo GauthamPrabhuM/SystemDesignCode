@@ -19,8 +19,8 @@ interface Props {
 }
 
 export function CodeEditor({ slug }: Props) {
-  const { activeFile, files, language, theme, setFile } = useEditor();
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const { activeFile, files, language, setFile } = useEditor();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const handleMount: OnMount = (editor, monaco) => {
     monaco.editor.defineTheme('sdc-dark', {
@@ -74,7 +74,7 @@ export function CodeEditor({ slug }: Props) {
         value={files[activeFile] ?? ''}
         onChange={handleChange}
         onMount={handleMount}
-        theme={theme === 'dark' ? 'sdc-dark' : 'vs-light'}
+        theme="sdc-dark"
         options={{
           fontFamily: 'JetBrains Mono, Menlo, Monaco, monospace',
           fontSize: 13,

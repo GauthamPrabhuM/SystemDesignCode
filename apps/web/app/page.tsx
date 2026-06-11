@@ -269,33 +269,21 @@ function Affiliates() {
       href: 'https://amzn.to/3RzDDIA',
     },
     {
-      title: 'Grokking the System Design Interview',
-      author: 'Educative.io',
-      tag: 'Course · Beginner-friendly',
-      href: 'https://www.educative.io/courses/grokking-modern-system-design-interview-for-engineers-managers?aff=systemdesigncode',
-    },
-    {
       title: 'System Design Interview Vol. 1 & 2',
       author: 'Alex Xu',
       tag: 'Book · Interview-focused',
       href: 'https://amzn.to/3RzwqMv',
     },
-    {
-      title: 'InterviewReady by Gaurav Sen',
-      author: 'Gaurav Sen',
-      tag: 'Course · Advanced',
-      href: 'https://interviewready.io/?ref=systemdesigncode',
-    },
   ];
   return (
     <section className="border-b border-border">
       <div className="mx-auto max-w-6xl px-6 py-20">
-        <h2 className="text-2xl font-medium tracking-tight">Recommended resources.</h2>
+        <h2 className="text-2xl font-medium tracking-tight">Recommended reading.</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Hand-picked books and courses that pair well with this platform.{' '}
+          Hand-picked books that pair well with this platform.{' '}
           <span className="text-muted-foreground/60">(Affiliate links — help keep the lights on at no extra cost to you.)</span>
         </p>
-        <div className="mt-8 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+        <div className="mt-8 grid gap-3 sm:grid-cols-2">
           {resources.map((r) => (
             <a
               key={r.title}
@@ -361,11 +349,10 @@ function Footer() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <span>© {new Date().getFullYear()} SystemDesignCode · MIT License</span>
           <div className="flex flex-wrap gap-4">
-            <Link href="/docs" className="hover:text-foreground">Docs</Link>
-            <Link href="/changelog" className="hover:text-foreground">Changelog</Link>
+            <a href={`${GITHUB_URL}/tree/main/docs`} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Docs</a>
+            <a href={`${GITHUB_URL}/commits/main`} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Changelog</a>
             <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">GitHub</a>
             <a href={BMC_URL} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Buy me a coffee ☕</a>
-            <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
           </div>
         </div>
         <p className="mt-3 text-muted-foreground/50">

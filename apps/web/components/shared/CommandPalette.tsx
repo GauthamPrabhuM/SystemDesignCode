@@ -3,18 +3,28 @@
 import { useEffect, useState } from 'react';
 import { Command } from 'cmdk';
 import { useRouter } from 'next/navigation';
-import { Play, Send, Moon, Sun, Search, FileText } from 'lucide-react';
-import { useEditor } from '@/lib/store/editor';
+import { Play, RotateCcw, Search, FileText, FileCode2, Code2, Home } from 'lucide-react';
+import { useEditor, type Language } from '@/lib/store/editor';
+
+const LANGUAGES: { id: Language; label: string }[] = [
+  { id: 'python', label: 'Python' },
+  { id: 'java', label: 'Java' },
+  { id: 'cpp', label: 'C++' },
+  { id: 'go', label: 'Go' },
+  { id: 'typescript', label: 'TypeScript' },
+  { id: 'javascript', label: 'JavaScript' },
+];
 
 interface Props {
   onRun?: () => void;
-  onSubmit?: () => void;
+  onResetCode?: () => void;
 }
 
-export function CommandPalette({ onRun, onSubmit }: Props) {
+export function CommandPalette({ onRun, onResetCode }: Props) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const { toggleTheme, theme } = useEditor();
+  const { language, setLanguage, files, activeFile, setActiveFile } = useEditor();
+  const filePaths = Object.keys(files);
 
   useEffect(() => {
     const onOpen = () => setOpen(true);
@@ -60,26 +70,55 @@ export function CommandPalette({ onRun, onSubmit }: Props) {
               shortcut="⌘↵"
               onSelect={() => { setOpen(false); onRun(); }}
             >
-              Run code
+              Run tests
             </CommandItem>
           )}
-          {onSubmit && (
+          {onResetCode && (
             <CommandItem
-              icon={<Send className="h-3.5 w-3.5" />}
-              onSelect={() => { setOpen(false); onSubmit(); }}
+              icon={<RotateCcw className="h-3.5 w-3.5" />}
+              onSelect={() => { setOpen(false); onResetCode(); }}
             >
-              Submit
+              Reset code to starter
             </CommandItem>
           )}
-          <CommandItem
-            icon={theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-            onSelect={() => { toggleTheme(); setOpen(false); }}
-          >
-            Toggle theme
-          </CommandItem>
         </Command.Group>
 
-        <Command.Group heading="Navigate">
+        {filePaths.length > 1 && (
+          <Command.Group heading="Files" className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            {filePaths.map((path) => (
+              <CommandItem
+                key={path}
+                icon={<FileCode2 className="h-3.5 w-3.5" />}
+                shortcut={path === activeFile ? 'active' : undefined}
+                onSelect={() => { setActiveFile(path); setOpen(false); }}
+              >
+                Open {path}
+              </CommandItem>
+            ))}
+          </Command.Group>
+        )}
+
+        {onRun && (
+          <Command.Group heading="Language" className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            {LANGUAGES.filter((l) => l.id !== language).map((l) => (
+              <CommandItem
+                key={l.id}
+                icon={<Code2 className="h-3.5 w-3.5" />}
+                onSelect={() => { setLanguage(l.id); setOpen(false); }}
+              >
+                Switch to {l.label}
+              </CommandItem>
+            ))}
+          </Command.Group>
+        )}
+
+        <Command.Group heading="Navigate" className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          <CommandItem
+            icon={<Home className="h-3.5 w-3.5" />}
+            onSelect={() => { router.push('/'); setOpen(false); }}
+          >
+            Home
+          </CommandItem>
           <CommandItem
             icon={<FileText className="h-3.5 w-3.5" />}
             onSelect={() => { router.push('/dashboard'); setOpen(false); }}

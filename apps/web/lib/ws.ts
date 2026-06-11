@@ -26,6 +26,7 @@ export type SubmissionEvent =
       memory_kb: number;
     }
   | { type: 'failed'; error: string; stderr?: string }
+  | { type: 'timeout'; error?: string }
   | { type: 'ai_review_done'; review_id: string };
 
 export interface StreamHandlers {

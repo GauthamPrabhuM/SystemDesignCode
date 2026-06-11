@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, XCircle, Clock, Loader2, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, Loader2, AlertTriangle, ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
 import type { SubmissionEvent } from '@/lib/ws';
 
 type Tab = 'tests' | 'console' | 'ai';
@@ -16,6 +16,11 @@ export function ConsolePanel({
 }) {
   const [tab, setTab] = useState<Tab>('tests');
 
+  // A new run started → jump to the Tests tab so results are visible immediately
+  useEffect(() => {
+    if (submittingId) setTab('tests');
+  }, [submittingId]);
+
   const tests = useMemo(
     () => events.filter((e): e is Extract<SubmissionEvent, { type: 'test' }> => e.type === 'test'),
     [events],
@@ -27,6 +32,8 @@ export function ConsolePanel({
   const result = events.find((e): e is Extract<SubmissionEvent, { type: 'result' }> => e.type === 'result');
   const failed = events.find((e): e is Extract<SubmissionEvent, { type: 'failed' }> => e.type === 'failed');
   const aiReady = events.some((e) => e.type === 'ai_review_done');
+  const lastStatus = [...events].reverse().find((e): e is Extract<SubmissionEvent, { type: 'status' }> => e.type === 'status');
+  const isQueued = !!submittingId && (!lastStatus || lastStatus.status === 'queued');
   const isRunning = !!submittingId;
 
   // Passed / total from test events (fallback if result hasn't arrived yet)
@@ -51,11 +58,12 @@ export function ConsolePanel({
         <div className="ml-auto text-[11px] text-muted-foreground">
           {isRunning ? (
             <span className="flex items-center gap-1.5 text-amber-400">
-              <Loader2 className="h-3 w-3 animate-spin" /> Running…
+              <Loader2 className="h-3 w-3 animate-spin" /> {isQueued ? 'Queued…' : 'Running…'}
             </span>
           ) : result ? (
             <span className={result.score === 100 ? 'text-emerald-400' : result.score >= 50 ? 'text-amber-400' : 'text-rose-400'}>
               {result.passed}/{result.total} tests · {result.score}% · {result.runtime_ms}ms
+              {result.memory_kb > 0 && ` · ${(result.memory_kb / 1024).toFixed(1)}MB`}
             </span>
           ) : failed ? (
             <span className="text-rose-400">Execution failed</span>
@@ -199,6 +207,8 @@ function StatusIcon({ status }: { status: string }) {
 type LogEvent = Extract<SubmissionEvent, { type: 'log' }>;
 
 function ConsoleLog({ logs, isRunning }: { logs: LogEvent[]; isRunning: boolean }) {
+  const [copied, setCopied] = useState(false);
+
   if (logs.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 py-10 text-xs text-muted-foreground">
@@ -208,17 +218,35 @@ function ConsoleLog({ logs, isRunning }: { logs: LogEvent[]; isRunning: boolean 
       </div>
     );
   }
+
+  const copyAll = () => {
+    navigator.clipboard.writeText(logs.map((l) => l.line).join('\n')).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+
   return (
-    <pre className="font-mono text-xs leading-relaxed">
-      {logs.map((l, i) => (
-        <div key={i} className={l.stream === 'stderr' ? 'text-rose-300' : 'text-muted-foreground'}>
-          {(l as any).test && (
-            <span className="mr-2 text-[10px] text-muted-foreground/50">[{(l as any).test}]</span>
-          )}
-          {l.line}
-        </div>
-      ))}
-    </pre>
+    <div className="relative">
+      <button
+        onClick={copyAll}
+        title="Copy all output"
+        className="absolute right-0 top-0 flex items-center gap-1 rounded border border-border bg-background/80 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground"
+      >
+        {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+      <pre className="font-mono text-xs leading-relaxed">
+        {logs.map((l, i) => (
+          <div key={i} className={l.stream === 'stderr' ? 'text-rose-300' : 'text-muted-foreground'}>
+            {(l as any).test && (
+              <span className="mr-2 text-[10px] text-muted-foreground/50">[{(l as any).test}]</span>
+            )}
+            {l.line}
+          </div>
+        ))}
+      </pre>
+    </div>
   );
 }
 

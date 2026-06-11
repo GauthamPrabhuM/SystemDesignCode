@@ -12,14 +12,11 @@ const LANGUAGES: { id: Language; label: string }[] = [
 ];
 
 export function LanguageSelector() {
-  const { language, setLanguage, reset } = useEditor();
+  const { language, setLanguage } = useEditor();
   return (
     <select
       value={language}
-      onChange={(e) => {
-        setLanguage(e.target.value as Language);
-        reset(); // clear files so starter for new language loads
-      }}
+      onChange={(e) => setLanguage(e.target.value as Language)}
       className="rounded border border-border bg-background px-2 py-0.5 text-xs"
     >
       {LANGUAGES.map((l) => (
